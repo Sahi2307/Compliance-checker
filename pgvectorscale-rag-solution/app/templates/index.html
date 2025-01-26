@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Compliance Checker Pro</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/css/styles.css">
+    <link rel="icon" href="/static/images/favicon.ico" type="image/x-icon">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Compliance Checker Pro</h1>
+            <p>Intelligent Document Analysis & Compliance Verification</p>
+        </header>
+
+        <main>
+            <section class="upload-section">
+                <h2>Upload Document</h2>
+                <form id="upload-form">
+                    <input 
+                        type="file" 
+                        id="file-upload" 
+                        name="file" 
+                        accept=".pdf" 
+                        required
+                    >
+                    <button type="submit">Upload Document</button>
+                </form>
+                <p id="upload-status" class="status"></p>
+            </section>
+
+            <section class="analyze-section">
+                <h2>Analyze Document</h2>
+                <button id="analyze-btn" disabled>Start Analysis</button>
+                <p id="analyze-status" class="status"></p>
+                <div id="result-container">
+                </div>
+            </section>
+        </main>
+
+        <footer>
+            <p>&copy; 2025 Compliance Checker Pro | Secure Document Intelligence</p>
+        </footer>
+    </div>
+    <script src="/static/js/app.js"></script>
+</body>
+</html>
