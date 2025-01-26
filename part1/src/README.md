@@ -1,56 +1,72 @@
-# AI-Powered Regulatory Compliance Checker for Contracts  
+# AI-Powered Regulatory Compliance Checker for Contracts
 
-This project is an AI-driven tool designed to analyze contracts for compliance with legal standards. Users can upload contract PDFs, and the system identifies potential compliance issues and provides detailed feedback.  
+## Overview
+Advanced AI-powered tool for legal document analysis using Falcon LLM and BERT, focusing on regulatory compliance and intelligent document insights.
 
-## Features  
-- **PDF File Ingestion**: API for uploading and validating PDF files.  
-- **Text Extraction**: Robust text extraction with edge-case handling.  
-- **Data Chunking**: Python function to split extracted text into smaller, overlapping chunks for processing.  
-- **Text Embeddings**: Generates embeddings for text chunks using a large language model (LLM) or pre-trained model.  
-- **Vector Store**:  
-  - **Local**: Creates and manages FAISS indexes for embeddings.  
-  - **Server**: Integration with hosted vector databases like Pinecone.  
-- **Compliance Analysis**: Compares contract contents with legal standards to detect compliance issues and provides actionable insights.  
+## Technology Stack
+- Python
+- Streamlit
+- Hugging Face (Falcon-7b, BERT)
+- PostgreSQL
+- LangChain
+- scikit-learn
 
-## Installation  
-1. Clone the repository:  
-   ```bash  
-   git clone https://github.com/Sahi2307/Compliance-checker.git 
-   cd contract-compliance-checker  
-   ```  
-2. Install dependencies:  
-   ```bash  
-   pip install -r requirements.txt.txt  
-   ```  
+## Key Features
+- PDF document analysis
+- Regulatory compliance scoring
+- Intelligent legal component extraction
+- Database-backed document comparison
+- Comprehensive report generation
 
-## Usage  
-1. Start the API server for PDF uploads:  
-   ```bash  
-   python api_server.py  
-   ```  
-2. Process a PDF:  
-   - Upload a PDF through the API endpoint.  
-   - Extracted text is chunked, embedded, and stored in a vector database.  
-3. Run the compliance checker:  
-   ```bash  
-   python compliance_checker.py  
-   ```  
-4. View results:  
-   - The system will flag any compliance issues and generate a detailed message based on the uploaded contract.  
+## Prerequisites
+- Python 3.8+
+- PostgreSQL
+- Hugging Face API Key
 
-## Technologies Used  
-- **Python**  
-- **LangChain**  
-- **FAISS**  
-- **Pinecone**  
-- **Large Language Models (LLMs)**  
+## Installation
 
-## Future Enhancements  
-- Support for additional document formats.  
-- Enhanced compliance rules tailored to specific legal frameworks.  
-- Integration with external legal databases.  
-  
+1. Clone Repository
+```bash
+git clone https://github.com/yourusername/ai-regulatory-compliance-checker.git
+cd ai-regulatory-compliance-checker
+```
 
-## Contributing  
-Contributions are welcome! Please open an issue or submit a pull request.  
+2. Setup Virtual Environment
+```bash
+python -m venv venv
+source venv/bin/activate  # Windows: venv\Scripts\activate
+```
 
+3. Install Dependencies
+```bash
+pip install -r requirements.txt
+```
+
+4. Database Configuration
+- Create PostgreSQL database
+- Update `config/settings.py`
+
+5. Run Application
+```bash
+streamlit run main.py
+```
+
+## Configuration
+- Set Hugging Face API token in `.env`
+- Customize database settings
+
+## Usage
+1. Upload PDF contract
+2. System analyzes document
+3. View compliance report
+4. Download detailed analysis
+
+## Contributing
+1. Fork repository
+2. Create feature branch
+3. Commit changes
+4. Push to branch
+5. Create pull request
+
+## License
+MIT License
