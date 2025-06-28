@@ -6,7 +6,7 @@ services:
     container_name: timescaledb
     environment:
       - POSTGRES_DB=postgres
-      - POSTGRES_PASSWORD=suchana
+      - POSTGRES_PASSWORD=postgres
     ports:
       - "5432:5432"
     volumes:

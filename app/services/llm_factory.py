@@ -1,5 +1,4 @@
 from typing import Any, Dict, List, Type
-
 import instructor
 from anthropic import Anthropic
 from openai import OpenAI
