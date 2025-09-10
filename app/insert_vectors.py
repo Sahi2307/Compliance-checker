@@ -1,6 +1,7 @@
 # %%
 
 from datetime import datetime
+from pathlib import Path
 import pandas as pd
 from database.vector_store import VectorStore
 from timescale_vector.client import uuid_from_time
@@ -8,9 +9,9 @@ from timescale_vector.client import uuid_from_time
 # Initialize VectorStore
 vec = VectorStore()
 
-# Read the CSV file
-#df = pd.read_csv("../data/faq_dataset.csv", sep=";")
-df = pd.read_csv("../data/final.csv", sep=",")
+# Read the CSV file (repo-relative path)
+DATA_PATH = Path(__file__).resolve().parent.parent / "data" / "final.csv"
+df = pd.read_csv(DATA_PATH, sep=",")
 df.head()
 # Prepare data for insertion
 import numpy as np

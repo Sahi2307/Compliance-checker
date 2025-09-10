@@ -2,12 +2,14 @@
 import streamlit as st
 import PyPDF2  # To extract content from PDFs
 from io import BytesIO  # To handle in-memory file objects
+from pathlib import Path
+from datetime import datetime
 from reportlab.lib.pagesizes import letter
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
 from reportlab.lib.styles import getSampleStyleSheet
 from database.vector_store import VectorStore
 from services.synthesizer import Synthesizer, SynthesizedResponse
-import tiktoken  # For token count
+# Removed tiktoken dependency - using Google Gemini instead
 
 # Initialize the vector search (replace this with your actual setup)
 vec = VectorStore()  # Adjust with the actual implementation
@@ -22,10 +24,16 @@ uploaded_files = st.file_uploader(
     accept_multiple_files=True,
 )
 
-# Function to count tokens using tiktoken
-def count_tokens(text, model="gpt-4"):
-    encoding = tiktoken.encoding_for_model(model)
-    return len(encoding.encode(text))
+# Optional: Ask a question about the uploaded PDFs
+user_question = st.text_input(
+    "Ask a question about the uploaded PDFs:",
+    placeholder="e.g., What is the governing law?",
+)
+
+# Function to count tokens - simplified for Google Gemini
+def count_tokens(text):
+    # Simple word-based token estimation (rough approximation)
+    return len(text.split()) * 1.3  # Rough estimate: 1.3 tokens per word
 
 # Enhanced PDF Generation Function
 def generate_pdf_with_features(response_text, uploaded_pdf_name):
@@ -77,6 +85,8 @@ def generate_pdf_with_features(response_text, uploaded_pdf_name):
 # Initialize session state to store results
 if "pdf_responses" not in st.session_state:
     st.session_state.pdf_responses = []
+if "qa_responses" not in st.session_state:
+    st.session_state.qa_responses = []
 
 # Process Button
 if st.button("Analyze Contracts"):
@@ -105,15 +115,15 @@ if st.button("Analyze Contracts"):
                     token_count = count_tokens(pdf_content)
                     total_tokens += token_count
 
-                    # Check token limit (8192 for GPT-4)
-                    if total_tokens > 8192:
+                    # Check token limit (adjusted for Google Gemini)
+                    if total_tokens > 1000000:  # Gemini has much higher token limits
                         st.error(
-                            f"Total token limit exceeded! The combined content of uploaded PDFs exceeds 8192 tokens."
+                            f"Total token limit exceeded! The combined content of uploaded PDFs exceeds 1M tokens."
                         )
                         break
 
-                    # Perform the vector search
-                    results = vec.search(pdf_content, limit=3)
+                    # Perform the vector search (top-1 only)
+                    results = vec.search(pdf_content, limit=1)
 
                     # Generate a response using the Synthesizer
                     response: SynthesizedResponse = Synthesizer.generate_response(
@@ -129,14 +139,68 @@ if st.button("Analyze Contracts"):
         # Save the responses in session state
         st.session_state.pdf_responses = pdf_responses
 
+# Q&A across uploaded PDFs (top-1 retrieval per PDF)
+if st.button("Ask Question for PDFs"):
+    if not uploaded_files:
+        st.warning("Please upload at least one PDF file first.")
+    elif not user_question.strip():
+        st.warning("Please enter a question.")
+    else:
+        qa_outputs = []
+        for uploaded_file in uploaded_files:
+            with st.spinner(f"Answering question for {uploaded_file.name}..."):
+                try:
+                    pdf_reader = PyPDF2.PdfReader(uploaded_file)
+                    pdf_content = ""
+                    for page in pdf_reader.pages:
+                        pdf_content += page.extract_text()
+                    if not pdf_content.strip():
+                        st.error(f"Unable to extract text from {uploaded_file.name}. Skipping.")
+                        continue
+                    # Retrieve top-1 relevant chunk
+                    results = vec.search(pdf_content, limit=1)
+                    # Generate answer using the question + retrieved context
+                    response: SynthesizedResponse = Synthesizer.generate_response(
+                        question=user_question, context=results
+                    )
+                    # Save report file
+                    reports_dir = Path(__file__).resolve().parent.parent / "reports"
+                    reports_dir.mkdir(parents=True, exist_ok=True)
+                    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+                    out_name = f"{uploaded_file.name.rsplit('.', 1)[0]}_qa_{timestamp}.pdf"
+                    pdf_file = generate_pdf_with_features(response.answer, uploaded_file.name)
+                    (reports_dir / out_name).write_bytes(pdf_file.getbuffer())
+                    qa_outputs.append((uploaded_file.name, response.answer, out_name, pdf_file))
+                except Exception as e:
+                    st.error(f"An error occurred while answering for {uploaded_file.name}: {e}")
+        st.session_state.qa_responses = qa_outputs
+
 # Display Download Buttons
 if "pdf_responses" in st.session_state and st.session_state.pdf_responses:
     st.subheader("Download Analysis Reports:")
+    reports_dir = Path(__file__).resolve().parent.parent / "reports"
+    reports_dir.mkdir(parents=True, exist_ok=True)
     for response_text, file_name in st.session_state.pdf_responses:
         pdf_file = generate_pdf_with_features(response_text, file_name)
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        out_name = f"{file_name.rsplit('.', 1)[0]}_analysis_{timestamp}.pdf"
+        (reports_dir / out_name).write_bytes(pdf_file.getbuffer())
         st.download_button(
             label=f"Download Analysis for {file_name}",
             data=pdf_file,
-            file_name=f"{file_name.rsplit('.', 1)[0]}_analysis_report.pdf",
+            file_name=out_name,
+            mime="application/pdf",
+        )
+
+# Display Q&A results and downloads
+if "qa_responses" in st.session_state and st.session_state.qa_responses:
+    st.subheader("Q&A Reports:")
+    for file_name, answer_text, out_name, pdf_file in st.session_state.qa_responses:
+        st.markdown(f"**{file_name}**")
+        st.write(answer_text)
+        st.download_button(
+            label=f"Download Q&A for {file_name}",
+            data=pdf_file,
+            file_name=out_name,
             mime="application/pdf",
         )

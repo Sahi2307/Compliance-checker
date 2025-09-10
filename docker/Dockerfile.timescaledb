@@ -1,0 +1,21 @@
+# Base TimescaleDB image (includes PostgreSQL 16)
+FROM timescale/timescaledb-ha:pg16
+
+# Install pgvector extension for PostgreSQL 16
+USER root
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends postgresql-16-pgvector \
+    && rm -rf /var/lib/apt/lists/*
+
+# Switch back to postgres user used by the base image
+USER postgres
+
+# Note: Extensions are created per-database at runtime via SQL:
+#   CREATE EXTENSION IF NOT EXISTS timescaledb;
+#   CREATE EXTENSION IF NOT EXISTS vector;
+#   CREATE EXTENSION IF NOT EXISTS pgcrypto;
+
+
+
+
+

@@ -47,7 +47,7 @@ class Synthesizer:
             },
         ]
 
-        llm = LLMFactory("openai")
+        llm = LLMFactory("google_gemini")
         return llm.create_completion(
             response_model=SynthesizedResponse,
             messages=messages,

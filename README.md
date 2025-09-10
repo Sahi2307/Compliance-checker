@@ -1,135 +1,185 @@
 
-## Pgvectorscale Documentation
+## Compliance Checker - RAG Application with Gemini AI
 
-For more information about using PostgreSQL as a vector database in AI applications with Timescale, check out these resources:
+A comprehensive compliance checking application that uses Google Gemini AI for document analysis and PostgreSQL with pgvector for vector storage and similarity search.
 
-- [GitHub Repository: pgvectorscale](https://github.com/timescale/pgvectorscale)
-- [Blog Post: PostgreSQL and Pgvector: Now Faster Than Pinecone, 75% Cheaper, and 100% Open Source](https://www.timescale.com/blog/pgvector-is-now-as-fast-as-pinecone-at-75-less-cost/)
-- [Blog Post: RAG Is More Than Just Vector Search](https://www.timescale.com/blog/rag-is-more-than-just-vector-search/)
-- [Blog Post: A Python Library for Using PostgreSQL as a Vector Database in AI Applications](https://www.timescale.com/blog/a-python-library-for-using-postgresql-as-a-vector-database-in-ai-applications/)
+### Key Features
 
-## Why PostgreSQL?
+* **Document Analysis**: Upload and analyze compliance documents using Gemini AI
+* **Vector Search**: Store document embeddings in PostgreSQL with pgvector extension
+* **Similarity Search**: Find similar documents and sections using cosine similarity
+* **Batch Processing**: Process multiple documents simultaneously
+* **Report Generation**: Generate detailed compliance analysis reports
 
-Using PostgreSQL with pgvectorscale as your vector database offers several key advantages over dedicated vector databases:
+## Why PostgreSQL + pgvector?
 
-- PostgreSQL is a robust, open-source database with a rich ecosystem of tools, drivers, and connectors. This ensures transparency, community support, and continuous improvements.
+Using PostgreSQL with pgvector as your vector database offers several key advantages over dedicated vector databases:
 
-- By using PostgreSQL, you can manage both your relational and vector data within a single database. This reduces operational complexity, as there's no need to maintain and synchronize multiple databases.
-
-- Pgvectorscale enhances pgvector with faster search capabilities, higher recall, and efficient time-based filtering. It leverages advanced indexing techniques, such as the DiskANN-inspired index, to significantly speed up Approximate Nearest Neighbor (ANN) searches.
-
-Pgvectorscale Vector builds on top of [pgvector](https://github.com/pgvector/pgvector), offering improved performance and additional features, making PostgreSQL a powerful and versatile choice for AI applications.
+* PostgreSQL is a robust, open-source database with a rich ecosystem of tools, drivers, and connectors. This ensures transparency, community support, and continuous improvements.
+* By using PostgreSQL, you can manage both your relational and vector data within a single database. This reduces operational complexity, as there's no need to maintain and synchronize multiple databases.
+* pgvector provides efficient vector similarity search with support for various distance metrics including cosine similarity, L2 distance, and inner product.
+* TimescaleDB integration offers time-series capabilities for tracking document processing and analysis over time.
 
 ## Prerequisites
 
-- Docker
-- Python 3.7+
-- OpenAI API key
-- PostgreSQL GUI client
+* Docker
+* Python 3.7+
+* Google Gemini API key
+* PostgreSQL GUI client (TablePlus recommended)
 
-## Steps
+## Quick Start
 
 1. Set up Docker environment
-2. Connect to the database using a PostgreSQL GUI client (I use TablePlus)
-3. Create a Python script to insert document chunks as vectors using OpenAI embeddings
-4. Create a Python function to perform similarity search
+2. Connect to the database using a PostgreSQL GUI client (TablePlus recommended)
+3. Configure environment variables with your Gemini API key
+4. Install Python dependencies
+5. Run the application
 
 ## Detailed Instructions
 
 ### 1. Set up Docker environment
 
-Create a `docker-compose.yml` file with the following content:
-
-```yaml
-services:
-  timescaledb:
-    image: timescale/timescaledb-ha:pg16
-    container_name: timescaledb
-    environment:
-      - POSTGRES_DB=postgres
-      - POSTGRES_PASSWORD=password
-    ports:
-      - "5432:5432"
-    volumes:
-      - timescaledb_data:/var/lib/postgresql/data
-    restart: unless-stopped
-
-volumes:
-  timescaledb_data:
-```
-
-Run the Docker container:
+Build and start the TimescaleDB container:
 
 ```bash
-docker compose up -d
+docker compose -f docker/docker-compose.yml up -d --build
 ```
+
+The database will be available at:
+* Host: localhost
+* Port: 5433
+* User: postgres
+* Password: password
+* Database: postgres
 
 ### 2. Connect to the database using a PostgreSQL GUI client
 
-- Open client
-- Create a new connection with the following details:
-  - Host: localhost
-  - Port: 5432
-  - User: postgres
-  - Password: password
-  - Database: postgres
+* Open TablePlus (or your preferred PostgreSQL client)
+* Create a new connection with the following details:  
+   * Host: localhost  
+   * Port: 5433  
+   * User: postgres  
+   * Password: password  
+   * Database: postgres
+   * Schema: public
 
-### 3. Create a Python script to insert document chunks as vectors
+### 3. Configure environment variables
 
-See `insert_vectors.py` for the implementation. This script uses OpenAI's `text-embedding-3-small` model to generate embeddings.
+Create a `.env` file in the root directory:
 
-### 4. Create a Python function to perform similarity search
+```bash
+TIMESCALE_SERVICE_URL=postgresql://postgres:password@localhost:5433/postgres
+GOOGLE_API_KEY=your_gemini_api_key_here
+```
 
-See `similarity_search.py` for the implementation. This script also uses OpenAI's `text-embedding-3-small` model for query embedding.
+### 4. Install Python dependencies
+
+```bash
+# Windows PowerShell
+.\venv\Scripts\Activate.ps1
+python -m pip install -r requirements.txt
+```
+
+### 5. Initialize the database
+
+Create the necessary database extensions and tables:
+
+```bash
+docker exec -it timescaledb psql -U postgres -d postgres -c "CREATE EXTENSION IF NOT EXISTS timescaledb; CREATE EXTENSION IF NOT EXISTS pgcrypto; CREATE EXTENSION IF NOT EXISTS vector;"
+```
+
+### 6. Load data into vector table
+
+```bash
+python app\insert_vectors.py
+```
+
+### 7. Run the Streamlit applications
+
+```bash
+# Single PDF Q&A
+python -m streamlit run app\main.py
+
+# Multiple PDFs (batch + Q&A per PDF)
+python -m streamlit run app\multiple.py
+```
+
+## Architecture
+
+* **Vector Database**: PostgreSQL (TimescaleDB) + `pgvector` extension
+* **Table**: `public.embedding_1`
+  - Columns: `id UUID`, `metadata JSONB`, `contents TEXT`, `embedding VECTOR(768)`, `created_at TIMESTAMPTZ`
+  - Index: HNSW on `embedding` column for fast similarity search
+* **Embeddings**: Google Gemini `text-embedding-004` (768 dimensions)
+* **LLM**: Gemini (`gemini-1.5-pro` or `gemini-1.5-flash`)
+* **Frontend**: Streamlit web interface
 
 ## Usage
 
-1. Create a copy of `example.env` and rename it to `.env`
-2. Open `.env` and fill in your OpenAI API key. Leave the database settings as is
-3. Run the Docker container
-4. Install the required Python packages using `pip install -r requirements.txt`
-5. Execute `insert_vectors.py` to populate the database
-6. Play with `similarity_search.py` to perform similarity searches
+### Single Document Analysis
+1. Run the main application: `python -m streamlit run app\main.py`
+2. Upload a PDF document
+3. Ask questions about the document
+4. View similarity search results
 
-## Using ANN search indexes to speed up queries
+### Batch Document Processing
+1. Run the multiple documents app: `python -m streamlit run app\multiple.py`
+2. Upload multiple PDF documents
+3. Process all documents in batch
+4. Generate individual analysis reports
 
-Timescale Vector offers indexing options to accelerate similarity queries, particularly beneficial for large vector datasets (10k+ vectors):
+## Database Schema
 
-1. Supported indexes:
-   - timescale_vector_index (default): A DiskANN-inspired graph index
-   - pgvector's HNSW: Hierarchical Navigable Small World graph index
-   - pgvector's IVFFLAT: Inverted file index
+### Create Table and Index
 
-2. The DiskANN-inspired index is Timescale's latest offering, providing improved performance. Refer to the [Timescale Vector explainer blog](https://www.timescale.com/blog/pgvector-is-now-as-fast-as-pinecone-at-75-less-cost/) for detailed information and benchmarks.
+```sql
+CREATE EXTENSION IF NOT EXISTS timescaledb;
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
+CREATE EXTENSION IF NOT EXISTS vector;
 
-For optimal query performance, creating an index on the embedding column is recommended, especially for large vector datasets.
+CREATE TABLE IF NOT EXISTS public.embedding_1 (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  metadata JSONB,
+  contents TEXT NOT NULL,
+  embedding VECTOR(768) NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
 
-## Cosine Similarity in Vector Search
+CREATE INDEX IF NOT EXISTS embedding_1_embedding_hnsw_idx
+ON public.embedding_1 USING hnsw (embedding vector_cosine_ops);
+```
 
-### What is Cosine Similarity?
+### Vector Search Optimization
 
-Cosine similarity measures the cosine of the angle between two vectors in a multi-dimensional space. It's a measure of orientation rather than magnitude.
+The application uses HNSW (Hierarchical Navigable Small World) indexing for fast similarity search:
 
-- Range: -1 to 1 (for normalized vectors, which is typical in text embeddings)
-- 1: Vectors point in the same direction (most similar)
-- 0: Vectors are orthogonal (unrelated)
-- -1: Vectors point in opposite directions (most dissimilar)
+* **HNSW Index**: Provides fast approximate nearest neighbor search
+* **Cosine Similarity**: Uses `vector_cosine_ops` for semantic similarity
+* **768 Dimensions**: Compatible with Gemini's `text-embedding-004` model
 
-### Cosine Distance
+## Troubleshooting
 
-In pgvector, the `<=>` operator computes cosine distance, which is 1 - cosine similarity.
+### Common Issues
 
-- Range: 0 to 2
-- 0: Identical vectors (most similar)
-- 1: Orthogonal vectors
-- 2: Opposite vectors (most dissimilar)
+* **TablePlus shows nothing**: Ensure you're connected to port `5433` and database `postgres`, schema `public`
+* **`type "vector" does not exist`**: Run `CREATE EXTENSION vector;` in the target database
+* **Embedding dimension mismatch**: Ensure database column is `VECTOR(768)` and matches Gemini's embedding dimensions
+* **Gemini API errors**: Check your API key and quota limits
+* **Connection refused**: Ensure Docker container is running with `docker ps`
 
-### Interpreting Results
+### Reports
 
-When you get results from similarity_search:
+* Generated PDF analysis reports are saved under `reports/` directory
+* Reports include document analysis, compliance findings, and recommendations
+* Each report is timestamped and can be downloaded from the Streamlit interface
 
-- Lower distance values indicate higher similarity.
-- A distance of 0 would mean exact match (rarely happens with embeddings).
-- Distances closer to 0 indicate high similarity.
-- Distances around 1 suggest little to no similarity.
-- Distances approaching 2 indicate opposite meanings (rare in practice).
+## References
+
+* [pgvector GitHub Repository](https://github.com/pgvector/pgvector)
+* [Google Gemini API Documentation](https://ai.google.dev/docs)
+* [TimescaleDB Documentation](https://docs.timescale.com/)
+* [Streamlit Documentation](https://docs.streamlit.io/)
+
+## License
+
+This project is for educational and research purposes. Please ensure compliance with Google's Gemini API terms of service and any applicable data protection regulations.
