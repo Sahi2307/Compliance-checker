@@ -96,4 +96,7 @@ venv/
 # exclude data from source control by default
 # /data/
 /dataset_pdf/
-/reports/
+
+# Explicitly include reports directory in version control
+!reports/
+!reports/**
