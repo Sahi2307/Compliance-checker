@@ -100,7 +100,7 @@ python app\insert_vectors.py
 # Single PDF Q&A
 python -m streamlit run app\main.py
 
-# Multiple PDFs (batch + Q&A per PDF)
+# Multiple PDFs (analysis per PDF)
 python -m streamlit run app\multiple.py
 ```
 
