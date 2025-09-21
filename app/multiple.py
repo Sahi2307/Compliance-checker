@@ -10,12 +10,14 @@ from reportlab.lib.styles import getSampleStyleSheet
 from database.vector_store import VectorStore
 from services.synthesizer import Synthesizer, SynthesizedResponse
 # Removed tiktoken dependency - using Google Gemini instead
+## OCR disabled per user request; relying on native text extraction only
 
 # Initialize the vector search (replace this with your actual setup)
 vec = VectorStore()  # Adjust with the actual implementation
 
 # Streamlit App Title
-st.title("Legal Contract Query Assistant")
+st.title("Legal Contract Assistant")
+st.subheader("Analyze contracts PDFs")
 
 # File Upload Section
 uploaded_files = st.file_uploader(
@@ -24,26 +26,28 @@ uploaded_files = st.file_uploader(
     accept_multiple_files=True,
 )
 
-# Optional: Ask a question about the uploaded PDFs
-user_question = st.text_input(
-    "Ask a question about the uploaded PDFs:",
-    placeholder="e.g., What is the governing law?",
-)
+# Q&A input and per-document selection removed per request
 
 # Function to count tokens - simplified for Google Gemini
 def count_tokens(text):
     # Simple word-based token estimation (rough approximation)
     return len(text.split()) * 1.3  # Rough estimate: 1.3 tokens per word
 
+# Keep payloads under Gemini limits by truncating large texts
+def truncate_text(text: str, max_chars: int = 20000) -> str:
+    if len(text) <= max_chars:
+        return text
+    return text[:max_chars]
+
 # Enhanced PDF Generation Function
-def generate_pdf_with_features(response_text, uploaded_pdf_name):
+def generate_pdf_with_features(response_text, uploaded_pdf_name, report_title: str = "Analysis Report"):
     """
     Generate a styled PDF based on input text, including bold, normal text, and bullet points.
     The uploaded PDF's name (without extension) is displayed as the title of the output PDF.
     """
     # Remove the .pdf extension from the uploaded file name
     pdf_name = uploaded_pdf_name.rsplit(".", 1)[0]
-    title_text = f"{pdf_name} Analysis Report"
+    title_text = f"{pdf_name} {report_title}"
 
     # Create an in-memory file
     buffer = BytesIO()
@@ -85,10 +89,10 @@ def generate_pdf_with_features(response_text, uploaded_pdf_name):
 # Initialize session state to store results
 if "pdf_responses" not in st.session_state:
     st.session_state.pdf_responses = []
-if "qa_responses" not in st.session_state:
-    st.session_state.qa_responses = []
+## Q&A state removed per request
 
-# Process Button
+# Analyze Contracts Section
+st.markdown("### Analyze Contracts")
 if st.button("Analyze Contracts"):
     if not uploaded_files:
         st.warning("Please upload at least one PDF file before submitting.")
@@ -104,7 +108,8 @@ if st.button("Analyze Contracts"):
                     pdf_reader = PyPDF2.PdfReader(uploaded_file)
                     pdf_content = ""
                     for page in pdf_reader.pages:
-                        pdf_content += page.extract_text()
+                        page_text = page.extract_text() or ""
+                        pdf_content += page_text
 
                     # Ensure the PDF content is not empty
                     if not pdf_content.strip():
@@ -122,12 +127,16 @@ if st.button("Analyze Contracts"):
                         )
                         break
 
-                    # Perform the vector search (top-1 only)
-                    results = vec.search(pdf_content, limit=1)
+                    # Keep request sizes small
+                    short_text = truncate_text(pdf_content, 20000)
 
-                    # Generate a response using the Synthesizer
+                    # Retrieve more relevant chunks for this document section
+                    results = vec.search(short_text, limit=8)
+
+                    # Generate a compliance analysis without sending the whole PDF as prompt
                     response: SynthesizedResponse = Synthesizer.generate_response(
-                        question=pdf_content, context=results
+                        question="Provide a compliance analysis for this contract section.",
+                        context=results,
                     )
 
                     # Store the response and file name for generating the PDF
@@ -138,42 +147,6 @@ if st.button("Analyze Contracts"):
 
         # Save the responses in session state
         st.session_state.pdf_responses = pdf_responses
-
-# Q&A across uploaded PDFs (top-1 retrieval per PDF)
-if st.button("Ask Question for PDFs"):
-    if not uploaded_files:
-        st.warning("Please upload at least one PDF file first.")
-    elif not user_question.strip():
-        st.warning("Please enter a question.")
-    else:
-        qa_outputs = []
-        for uploaded_file in uploaded_files:
-            with st.spinner(f"Answering question for {uploaded_file.name}..."):
-                try:
-                    pdf_reader = PyPDF2.PdfReader(uploaded_file)
-                    pdf_content = ""
-                    for page in pdf_reader.pages:
-                        pdf_content += page.extract_text()
-                    if not pdf_content.strip():
-                        st.error(f"Unable to extract text from {uploaded_file.name}. Skipping.")
-                        continue
-                    # Retrieve top-1 relevant chunk
-                    results = vec.search(pdf_content, limit=1)
-                    # Generate answer using the question + retrieved context
-                    response: SynthesizedResponse = Synthesizer.generate_response(
-                        question=user_question, context=results
-                    )
-                    # Save report file
-                    reports_dir = Path(__file__).resolve().parent.parent / "reports"
-                    reports_dir.mkdir(parents=True, exist_ok=True)
-                    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-                    out_name = f"{uploaded_file.name.rsplit('.', 1)[0]}_qa_{timestamp}.pdf"
-                    pdf_file = generate_pdf_with_features(response.answer, uploaded_file.name)
-                    (reports_dir / out_name).write_bytes(pdf_file.getbuffer())
-                    qa_outputs.append((uploaded_file.name, response.answer, out_name, pdf_file))
-                except Exception as e:
-                    st.error(f"An error occurred while answering for {uploaded_file.name}: {e}")
-        st.session_state.qa_responses = qa_outputs
 
 # Display Download Buttons
 if "pdf_responses" in st.session_state and st.session_state.pdf_responses:
@@ -192,15 +165,7 @@ if "pdf_responses" in st.session_state and st.session_state.pdf_responses:
             mime="application/pdf",
         )
 
-# Display Q&A results and downloads
-if "qa_responses" in st.session_state and st.session_state.qa_responses:
-    st.subheader("Q&A Reports:")
-    for file_name, answer_text, out_name, pdf_file in st.session_state.qa_responses:
-        st.markdown(f"**{file_name}**")
-        st.write(answer_text)
-        st.download_button(
-            label=f"Download Q&A for {file_name}",
-            data=pdf_file,
-            file_name=out_name,
-            mime="application/pdf",
-        )
+## Q&A results removed per request
+
+# Diagnostics panel for the selected file (if any)
+## Diagnostics panel removed per request

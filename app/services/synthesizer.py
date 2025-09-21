@@ -26,7 +26,14 @@ You are an AI assistant designed to evaluate contracts for compliance, risk, and
    - Clarity and readability of the contract terms
    - Alignment with best practices for contract management
 2. Clearly state whether the contract meets the required legal standards and why.
-3. Provide a compliance score between 0 and 100, where:
+3. Provide a compliance score between 0 and 100 using this weighted rubric (adjust weights if justified in Reasoning):
+   - Core legal protections (indemnity, limitation of liability, warranties): 30
+   - Data protection and confidentiality (privacy, security, confidentiality): 20
+   - Operational clarity (scope, SLAs, termination, change control): 20
+   - Compliance with applicable law (governing law, export, anti-bribery, IP ownership/license): 20
+   - Drafting quality and completeness (definitions, ambiguity, conflicts): 10
+   If a section is missing, allocate zero for that section and state it explicitly.
+   Score bands:
    - 0-40: Poor Compliance
    - 41-70: Moderate Compliance
    - 71-100: Excellent Compliance
@@ -46,7 +53,7 @@ You are an AI assistant designed to evaluate contracts for compliance, risk, and
 - [List specific areas where the contract can be improved, such as ambiguous terms, missing clauses, etc.]
 
 **Reasoning:**
-- Provide a detailed explanation for the score, referencing specific contract clauses, legal requirements, and best practices.
+- Provide a detailed explanation for the score, referencing specific contract clauses, legal requirements, and best practices. Cite the retrieved snippets when possible.
 
 **Additional Information (if needed):**
 - Mention any missing details or additional context required for a complete evaluation, such as clauses that are typically required but missing from the contract, or areas that need clarification.
@@ -56,7 +63,7 @@ You are an AI assistant designed to evaluate contracts for compliance, risk, and
 	   
 	    
 	@staticmethod
-	def generate_response(question: str, context: pd.DataFrame) -> SynthesizedResponse:
+	def generate_response(question: str, context: pd.DataFrame, concise_answer: bool = False) -> SynthesizedResponse:
 		"""Generates a synthesized response based on the question and context.
 
 		Args:
@@ -68,10 +75,19 @@ You are an AI assistant designed to evaluate contracts for compliance, risk, and
 		"""
 		print("Columns in context DataFrame:", context.columns)
 		context_str = Synthesizer.dataframe_to_json(
-			context, columns_to_keep=["content", "filename", "document_name", "exact_law", "parties"]
+			context, columns_to_keep=["content", "filename"]
 		)
+		if concise_answer:
+			concise_system = (
+				"You are a contract QA assistant. Answer the user's question using only the provided context. "
+				"Respond in 4-5 lines, plain text. Do not include headings, scores, verdicts, or sections. "
+				"If the answer is not in the context, say you cannot determine from the provided text."
+			)
+			system_content = concise_system
+		else:
+			system_content = Synthesizer.SYSTEM_PROMPT
 		messages = [
-			{"role": "system", "content": Synthesizer.SYSTEM_PROMPT},
+			{"role": "system", "content": system_content},
 			{"role": "user", "content": f"# User question:\n{question}"},
 			{
 				"role": "assistant",
@@ -99,7 +115,20 @@ You are an AI assistant designed to evaluate contracts for compliance, risk, and
 		Returns:
 			str: A JSON string representation of the selected columns.
 		"""
-		return context[columns_to_keep].to_json(orient="records", indent=2)
+		df = context[columns_to_keep].copy()
+		# Truncate per-row content to keep payload small
+		if "content" in df.columns:
+			df["content"] = df["content"].astype(str).str.slice(0, 400)
+		# Keep only the top-N rows
+		df = df.head(6)
+		json_str = df.to_json(orient="records")
+		# If still too large, aggressively shrink content and rows
+		if len(json_str) > 24000:
+			if "content" in df.columns:
+				df["content"] = df["content"].astype(str).str.slice(0, 200)
+			df = df.head(4)
+			json_str = df.to_json(orient="records")
+		return json_str
 
 
 

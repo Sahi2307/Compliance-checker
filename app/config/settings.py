@@ -7,7 +7,11 @@ from typing import Optional
 from dotenv import load_dotenv
 from pydantic import BaseModel, Field
 
-load_dotenv(dotenv_path="./.env")
+# Load .env from the project root regardless of CWD
+_CURRENT_DIR = os.path.dirname(__file__)
+_PROJECT_ROOT = os.path.abspath(os.path.join(_CURRENT_DIR, os.pardir, os.pardir))
+_ENV_PATH = os.path.join(_PROJECT_ROOT, ".env")
+load_dotenv(dotenv_path=_ENV_PATH)
 
 
 def setup_logging():
@@ -29,7 +33,7 @@ class GoogleGeminiSettings(LLMSettings):
 	"""Google Gemini-specific settings extending LLMSettings."""
 
 	api_key: str = Field(default_factory=lambda: os.getenv("GOOGLE_API_KEY"))
-	default_model: str = Field(default="gemini-1.5-flash")
+	default_model: str = Field(default="gemini-1.5-pro")
 	embedding_model: str = Field(default="text-embedding-004")
 
 
